@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View, Image, TouchableOpacity, SafeAreaView, Dimensions, Platform } from 'react-native';
+import { StyleSheet, Text, View, Image, TouchableOpacity, Dimensions, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 

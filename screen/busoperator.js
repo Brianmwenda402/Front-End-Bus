@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, Animated, TouchableOpacity,
-  Dimensions, SafeAreaView, ScrollView, Platform, StatusBar,
+  Dimensions, ScrollView, Platform, StatusBar,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 const { width } = Dimensions.get("window");

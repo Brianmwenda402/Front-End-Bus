@@ -4,13 +4,13 @@ import {
   Text,
   View,
   TouchableOpacity,
-  SafeAreaView,
   Platform,
   ScrollView,
   Alert,
   Modal,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { seatStorage } from '../utils/seatStorage';

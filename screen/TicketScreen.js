@@ -35,8 +35,8 @@ export default function TicketScreen({ navigation, route }) {
   };
   
   const passengers = route?.params?.passengers || [
-    { fullName: 'Kasamba Shakalima', phone: '+260-97-123-4567', email: 'kasamba@email.com' },
-    { fullName: 'Amelia Fernando', phone: '+260-97-987-6543', email: 'amelia@email.com' },
+    { fullName: 'Kasamba Shakalima', nrc: '123456/78/1' },
+    { fullName: 'Amelia Fernando', nrc: '223456/78/1' },
   ];
   const schedule = route?.params?.schedule || { date: getCurrentDate(), depart: '6:00 AM', seatNumbers: ['3A', '3B'] };
   const bookingRefs = route?.params?.bookings
@@ -168,12 +168,8 @@ export default function TicketScreen({ navigation, route }) {
                   </View>
                 </View>
                 <View style={styles.passengerContact}>
-                  <Text style={styles.contactLabel}>Phone:</Text>
-                  <Text style={styles.contactValue}>{passenger.phone || 'N/A'}</Text>
-                </View>
-                <View style={styles.passengerContact}>
-                  <Text style={styles.contactLabel}>Email:</Text>
-                  <Text style={styles.contactValue}>{passenger.email || 'N/A'}</Text>
+                  <Text style={styles.contactLabel}>NRC:</Text>
+                  <Text style={styles.contactValue}>{passenger.nrc || 'N/A'}</Text>
                 </View>
               </View>
             ))}

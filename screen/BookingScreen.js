@@ -120,8 +120,7 @@ export default function MyTicketsScreen({ navigation }) {
       passengers: [
         {
           fullName: user.fullName || 'Passenger',
-          phone: user.phone || 'N/A',
-          email: user.email || 'N/A',
+          nrc: user.nrc || 'N/A',
         }
       ],
       schedule: ticket.schedule,

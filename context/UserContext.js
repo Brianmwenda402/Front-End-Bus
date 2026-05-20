@@ -6,6 +6,7 @@ const DEFAULT_USER = {
   fullName: 'Brian Mwenda',
   email: 'brian@transitx.zm',
   phone: '+260 97 000 0000',
+  nrc: '000000/00/0',
 };
 
 export function UserProvider({ children }) {
@@ -30,7 +31,7 @@ export function UserProvider({ children }) {
         seatNumbers: ['2A', '2B'],
         pricePerSeat: 190,
       },
-      passengers: [{ fullName: 'Brian Mwenda', phone: '+260 97 000 0000' }],
+      passengers: [{ fullName: 'Brian Mwenda', nrc: '000000/00/0' }],
       totalAmount: 380,
     },
   ]);

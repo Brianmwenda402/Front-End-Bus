@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, Animated, TouchableOpacity,
-  Dimensions, SafeAreaView, ScrollView, Platform, StatusBar,
+  Dimensions, ScrollView, Platform, StatusBar,
   Modal, TextInput, ActivityIndicator, FlatList, Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import TimeScrollPicker from "../components/TimeScrollPicker";
 import { parseTimeToTimestamp, formatTimestamp, durationBetween } from "../utils/timeUtils";
@@ -78,8 +79,8 @@ export default function AdminDashboard({ navigation }) {
     try {
       setLoading(true);
       const [tripsRes, bookingsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/trips/all`),
-        fetch(`${API_BASE_URL}/bookings/all`)
+        fetch(`${API_BASE_URL}api/trips/all`),
+        fetch(`${API_BASE_URL}api/bookings/all`)
       ]);
 
       const tripsData = await tripsRes.json();
@@ -123,7 +124,7 @@ export default function AdminDashboard({ navigation }) {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/trips/create`, {
+      const response = await fetch(`${API_BASE_URL}api/trips/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -77,6 +77,7 @@ export default function CreateAccountScreen({ navigation, route }) {
           id: data.id,
           username: data.username,
           email: data.email,
+          nrc: data.nrc || '',
           role: isAdmin ? 'Admin' : 'User',
         });
 

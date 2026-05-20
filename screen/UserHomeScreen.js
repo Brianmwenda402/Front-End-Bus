@@ -178,8 +178,8 @@ export default function TripsScreen({ navigation }) {
       setError('');
       
       // Fetch all available trips
-      const tripsRes = await fetch(`${API_BASE_URL}/trips`);
-      const bookingsRes = await fetch(`${API_BASE_URL}/bookings/all`);
+      const tripsRes = await fetch(`${API_BASE_URL}/trips/all`);
+      const bookingsRes = await fetch(`${API_BASE_URL}api/bookings/all`);
 
       if (!tripsRes.ok) {
         throw new Error(`HTTP error! status: ${tripsRes.status}`);

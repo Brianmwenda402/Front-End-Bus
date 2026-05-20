@@ -1,8 +1,9 @@
 import React from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity,
-  SafeAreaView, Dimensions, Image, Platform,
+  Dimensions, Image, Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 
