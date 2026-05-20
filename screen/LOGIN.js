@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useUser } from '../context/UserContext';
+import CONFIG from '../config/config';
 
 const { width } = require('react-native').Dimensions.get('window');
 
@@ -26,7 +27,7 @@ const COLORS = {
   white:         '#FFFFFF',
 };
 
-const API_BASE_URL = "http://10.26.129.86:8089";
+const API_BASE_URL = CONFIG.API_BASE_URL;
 
 export default function LoginScreen({ navigation, route }) {
   const role = route?.params?.role || 'User';

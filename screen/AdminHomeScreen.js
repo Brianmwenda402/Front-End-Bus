@@ -7,6 +7,7 @@ import {
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import TimeScrollPicker from "../components/TimeScrollPicker";
 import { parseTimeToTimestamp, formatTimestamp, durationBetween } from "../utils/timeUtils";
+import CONFIG from "../config/config";
 
 const { width } = Dimensions.get("window");
 
@@ -26,7 +27,7 @@ const COLORS = {
   white:         "#FFFFFF",
 };
 
-const API_BASE_URL = "http://10.34.225.86:8089/api";
+const API_BASE_URL = `${CONFIG.API_BASE_URL}/api`;
 
 const menuItems = [
   { label: "Add Trip",         icon: "plus-circle",         color: COLORS.cyan,    screen: "AddTrip"        },
@@ -77,8 +78,8 @@ export default function AdminDashboard({ navigation }) {
     try {
       setLoading(true);
       const [tripsRes, bookingsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/trips`),
-        fetch(`${API_BASE_URL}/bookings`)
+        fetch(`${API_BASE_URL}/trips/all`),
+        fetch(`${API_BASE_URL}/bookings/all`)
       ]);
 
       const tripsData = await tripsRes.json();
@@ -122,7 +123,7 @@ export default function AdminDashboard({ navigation }) {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/trips`, {
+      const response = await fetch(`${API_BASE_URL}/trips/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -163,7 +164,7 @@ export default function AdminDashboard({ navigation }) {
 
   const handleDeleteTrip = async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/trips/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/trips/delete/${id}`, {
         method: "DELETE",
       });
 

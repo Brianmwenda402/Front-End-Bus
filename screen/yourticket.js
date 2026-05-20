@@ -1,12 +1,10 @@
 import React from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity,
-  Dimensions, Image, Platform,
+  SafeAreaView, Dimensions, Image, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { UserInfoBadge } from '../components/UserInfoBadge';
 
 const { width, height } = Dimensions.get('window');
 
@@ -39,10 +37,6 @@ export default function TicketScreen({ navigation, route }) {
     { fullName: 'Amelia Fernando', phone: '+260-97-987-6543', email: 'amelia@email.com' },
   ];
   const schedule = route?.params?.schedule || { date: getCurrentDate(), depart: '6:00 AM', seatNumbers: ['3A', '3B'] };
-  const bookingRefs = route?.params?.bookings
-    ?.map((booking) => booking?.id)
-    .filter((id) => id != null);
-  const totalPrice = (Number(schedule.pricePerSeat) || 0) * (schedule.seatNumbers?.length || 1);
 
   return (
     <View style={styles.container}>
@@ -60,11 +54,6 @@ export default function TicketScreen({ navigation, route }) {
           </TouchableOpacity>
           <Text style={styles.screenLabel}>Your Ticket</Text>
           <View style={{ width: 40 }} />
-        </View>
-
-        {/* User Info Badge */}
-        <View style={styles.userInfoWrapper}>
-          <UserInfoBadge compact={true} />
         </View>
 
         {/* bus logo */}
@@ -89,7 +78,7 @@ export default function TicketScreen({ navigation, route }) {
           {/* route */}
           <View style={styles.routeRow}>
             <View style={styles.routeBlock}>
-              <Text style={styles.routeCity}>{(schedule.from || 'Lusaka').toLowerCase()}</Text>
+              <Text style={styles.routeCity}>lusaka</Text>
               <Text style={styles.routeSub}>Origin</Text>
             </View>
             <View style={styles.routeMiddle}>
@@ -100,7 +89,7 @@ export default function TicketScreen({ navigation, route }) {
               <View style={styles.routeLine} />
             </View>
             <View style={[styles.routeBlock, { alignItems: 'flex-end' }]}>
-              <Text style={styles.routeCity}>{(schedule.to || 'Destination').toLowerCase()}</Text>
+              <Text style={styles.routeCity}>chipata</Text>
               <Text style={styles.routeSub}>Destination</Text>
             </View>
           </View>
@@ -116,19 +105,11 @@ export default function TicketScreen({ navigation, route }) {
           <View style={styles.detailsGrid}>
             <View style={styles.detailCell}>
               <Text style={styles.detailLabel}>Bus Name</Text>
-              <Text style={styles.detailValue}>{schedule.busName || 'N/A'}</Text>
+              <Text style={styles.detailValue}>{schedule.busName || 'power tools'}</Text>
             </View>
             <View style={[styles.detailCell, { alignItems: 'flex-end' }]}>
               <Text style={styles.detailLabel}>Price</Text>
-              <Text style={[styles.detailValue, { color: COLORS.gold }]}>ZMW {totalPrice.toLocaleString()}</Text>
-            </View>
-            <View style={styles.detailCell}>
-              <Text style={styles.detailLabel}>Departure</Text>
-              <Text style={styles.detailValue}>{schedule.depart || '--'}</Text>
-            </View>
-            <View style={[styles.detailCell, { alignItems: 'flex-end' }]}>
-              <Text style={styles.detailLabel}>Arrival</Text>
-              <Text style={styles.detailValue}>{schedule.arrive || '--'}</Text>
+              <Text style={[styles.detailValue, { color: COLORS.gold }]}>ZMW {(schedule.pricePerSeat * (schedule.seatNumbers?.length || 1))}</Text>
             </View>
             <View style={styles.detailCell}>
               <Text style={styles.detailLabel}>Date</Text>
@@ -136,13 +117,7 @@ export default function TicketScreen({ navigation, route }) {
             </View>
             <View style={[styles.detailCell, { alignItems: 'flex-end' }]}>
               <Text style={styles.detailLabel}>Seats</Text>
-              <Text style={styles.detailValue}>{schedule.seatNumbers?.join(', ') || '--'}</Text>
-            </View>
-            <View style={[styles.detailCell, { width: '100%' }]}>
-              <Text style={styles.detailLabel}>Booking Reference</Text>
-              <Text style={styles.detailValue}>
-                {bookingRefs?.length ? bookingRefs.join(', ') : schedule?.backendBookingIds?.join(', ') || 'N/A'}
-              </Text>
+              <Text style={styles.detailValue}>{schedule.seatNumbers?.length || 2} Seats</Text>
             </View>
           </View>
 

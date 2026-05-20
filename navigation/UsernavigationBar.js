@@ -7,7 +7,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import UserHomeScreen from '../screen/UserHomeScreen';
 import BookingScreen from '../screen/BookingScreen';
 import UserProfile from '../screen/UserProfile';
-import SelectBusScreen from '../screen/Seletctbus';
+import SelectBusScreen from '../screen/Selectbus';
 import SelectSeatsScreen from '../screen/Selectseats';
 import PassengerDetailsScreen from '../screen/PassengerDetailsScreen';
 import PaymentConfirmationScreen from '../screen/PaymentScreen';

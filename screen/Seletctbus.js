@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import CONFIG from '../config/config';
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,7 +24,7 @@ const COLORS = {
   white:         '#FFFFFF',
 };
 
-const API_BASE_URL = "http://10.26.129.86:8089/api";
+const API_BASE_URL = `${CONFIG.API_BASE_URL}/api`;
 
 export default function SelectBusScreen({ navigation, route }) {
   const routeData = route?.params || {};

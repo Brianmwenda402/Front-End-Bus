@@ -1,199 +1,441 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  StyleSheet, Text, View, TouchableOpacity,
-  Dimensions, Platform, ScrollView, Alert,
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  SafeAreaView,
+  Platform,
+  ScrollView,
+  Alert,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-
-const { width, height } = Dimensions.get('window');
+import { seatStorage } from '../utils/seatStorage';
+import { bookingsApi } from '../api/api';
 
 const COLORS = {
-  root:         '#0f172a',
-  blobBlue:     '#5C90EB',
-  blobCyan:     '#589BF2',
-  card:         '#1e293b',
-  cardBorder:   '#334155',
-  textHeader:   '#f8fafc',
-  textSecondary:'#94a3b8',
-  primary:      '#5C90EB',
-  inputBg:      '#162032',
-  white:        '#FFFFFF',
+  root: '#0f172a',
+  blobBlue: '#5C90EB',
+  blobCyan: '#589BF2',
+  card: '#1e293b',
+  cardBorder: '#334155',
+  textHeader: '#f8fafc',
+  textSecondary: '#94a3b8',
+  primary: '#5C90EB',
+  inputBg: '#162032',
+  seatBooked: '#f87171',
+  seatSelected: '#4ade80',
+  seatAvailable: '#334155',
+  white: '#FFFFFF',
 };
 
-export default function SelectSeatsScreen({ navigation, route }) {
-  const bus = route?.params?.bus || {
-    busNumber: 'BUS-001',
-    source: 'Lusaka',
-    destination: 'Livingstone',
-    depart: '6:00 AM',
-    arrive: '12:00 PM',
-    price: 250,
-    totalSeats: 45,
-    id: 1,
-  };
+const seatRows = [
+  ['a', 'a', 'gap', 'a', 'a', 'a'],
+  ['a', 'a', 'gap', 'a', 'a', 'a'],
+  ['a', 'a', 'gap', 'a', 'a', 'a'],
+  ['a', 'a', 'gap', 'a', 'a', 'a'],
+  ['a', 'a', 'gap', 'a', 'a', 'a'],
+  ['a', 'a', 'gap', 'a', 'a', 'a'],
+  ['a', 'a', 'gap', 'a', 'a', 'a'],
+  ['a', 'a', 'a', 'a', 'a', 'a'],
+];
 
-  const [quantity, setQuantity] = useState(1);
-  const [loading, setLoading] = useState(false);
+const extractSeatNumbers = (seatStatusResponse) => {
+  const extracted = [];
 
-  const navigateToRouteInParentChain = (routeName, params) => {
-    let currentNav = navigation;
-
-    while (currentNav) {
-      const state = currentNav.getState?.();
-      if (state?.routeNames?.includes(routeName)) {
-        currentNav.navigate(routeName, params);
-        return true;
-      }
-      currentNav = currentNav.getParent?.();
+  const collectSeat = (candidate) => {
+    const numeric = Number(candidate);
+    if (Number.isInteger(numeric) && numeric > 0) {
+      extracted.push(numeric);
     }
-
-    return false;
   };
 
-  const handleBook = async () => {
-    if (quantity === 0) {
-      Alert.alert("No Tickets Selected", "Please select at least one ticket");
+  const visit = (value) => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
       return;
     }
 
-    setLoading(true);
-    try {
-      // Demo-only fake processing. No backend booking call is made here.
-      await new Promise((resolve) => setTimeout(resolve, 1400));
-
-      const seatNumbers = Array.from({ length: quantity }, (_, i) => i + 1);
-      const params = {
-        schedule: {
-          busName: bus.busNumber,
-          busType: 'Bus Trip',
-          from: bus.source,
-          to: bus.destination,
-          depart: bus.depart,
-          arrive: bus.arrive,
-          seatNumbers,
-          pricePerSeat: bus.price,
-          date: new Date().toLocaleDateString('en-US'),
-        },
-        passengers: Array.from({ length: quantity }, (_, i) => ({
-          fullName: `Passenger ${i + 1}`,
-          phone: '+260-97-123-4567',
-          email: `passenger${i + 1}@email.com`,
-        })),
-      };
-
-      const didNavigate = navigateToRouteInParentChain('BookingSuccess', params);
-      if (!didNavigate) {
-        navigation.replace('YourTicket', params);
-      }
-    } catch (error) {
-      console.error("Booking flow error:", error);
-      Alert.alert("Error", "Unable to continue booking flow. Please try again.");
-    } finally {
-      setLoading(false);
+    if (typeof value === 'number' || typeof value === 'string') {
+      collectSeat(value);
+      return;
     }
+
+    if (!value || typeof value !== 'object') {
+      return;
+    }
+
+    if (value.seatNumber != null) {
+      collectSeat(value.seatNumber);
+      return;
+    }
+
+    if (value.seat != null) {
+      collectSeat(value.seat);
+      return;
+    }
+
+    if (Array.isArray(value.bookedSeats)) {
+      value.bookedSeats.forEach(visit);
+      return;
+    }
+
+    if (Array.isArray(value.occupiedSeats)) {
+      value.occupiedSeats.forEach(visit);
+      return;
+    }
+
+    Object.entries(value).forEach(([key, nestedValue]) => {
+      if (nestedValue === true) {
+        collectSeat(key);
+      } else {
+        visit(nestedValue);
+      }
+    });
+  };
+
+  visit(seatStatusResponse);
+
+  return [...new Set(extracted)];
+};
+
+export default function SelectSeatsScreen({ navigation, route }) {
+  const selectedBus = route?.params?.bus || {
+    name: 'POWER TOOLS',
+    type: 'Time bus',
+    timeFrom: '5:00 AM',
+    timeTo: '12:00 PM',
+    duration: '5h',
+    price: 'ZMW 500',
+    from: 'LUSAKA',
+    to: 'CHIPATA',
+  };
+
+  const [selected, setSelected] = useState([]);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [bookedSeatNumbers, setBookedSeatNumbers] = useState([]);
+  const [loadingSeatStatus, setLoadingSeatStatus] = useState(false);
+
+  const selectedBusTripId = selectedBus?.id;
+
+  useEffect(() => {
+    const loadTripSeatStatus = async () => {
+      if (!selectedBusTripId) {
+        return;
+      }
+
+      setLoadingSeatStatus(true);
+      try {
+        const response = await bookingsApi.getTripSeatsStatus(selectedBusTripId);
+        const parsedSeatNumbers = extractSeatNumbers(response);
+        setBookedSeatNumbers(parsedSeatNumbers);
+      } catch (error) {
+        console.error('Failed to fetch trip seat status:', error);
+      } finally {
+        setLoadingSeatStatus(false);
+      }
+    };
+
+    loadTripSeatStatus();
+  }, [selectedBusTripId]);
+
+  const bookedSeatSet = useMemo(() => new Set(bookedSeatNumbers), [bookedSeatNumbers]);
+
+  const getSeatName = (rowIndex, seatIndex) => {
+    const row = rowIndex + 1;
+    const rowPattern = seatRows[rowIndex] || [];
+    const seatLetters = rowPattern.includes('gap')
+      ? ['A', 'B', null, 'D', 'E', 'F']
+      : ['A', 'B', 'C', 'D', 'E', 'F'];
+
+    return `${row}${seatLetters[seatIndex] || ''}`;
+  };
+
+  const getSeatNumber = (rowIndex, seatIndex) => {
+    let seatNumber = 0;
+
+    for (let i = 0; i < seatRows.length; i += 1) {
+      for (let j = 0; j < seatRows[i].length; j += 1) {
+        if (seatRows[i][j] === 'gap') {
+          continue;
+        }
+
+        seatNumber += 1;
+
+        if (i === rowIndex && j === seatIndex) {
+          return seatNumber;
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const toggleSeat = (rowIndex, seatIndex, seatType) => {
+    if (seatType === 'gap') {
+      return;
+    }
+
+    const seatName = getSeatName(rowIndex, seatIndex);
+    const seatNumber = getSeatNumber(rowIndex, seatIndex);
+    const key = `${rowIndex}-${seatIndex}`;
+
+    if (seatType === 'b') {
+      Alert.alert('Seat Unavailable', `${seatName} is already booked.`);
+      return;
+    }
+
+    if (seatStorage.isReserved(seatName)) {
+      Alert.alert('Seat Unavailable', `${seatName} has been temporarily reserved.`);
+      return;
+    }
+
+    if (seatNumber && bookedSeatSet.has(seatNumber)) {
+      Alert.alert('Seat Unavailable', `${seatName} is already booked.`);
+      return;
+    }
+
+    setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  };
+
+  const handleReserve = () => {
+    if (selected.length === 0) {
+      Alert.alert('Error', 'Please select at least one seat');
+      return;
+    }
+
+    setShowBookingModal(true);
+  };
+
+  const proceedWithBooking = (option) => {
+    const selectedSeats = selected
+      .slice()
+      .sort((a, b) => {
+        const [aRow, aSeat] = a.split('-').map(Number);
+        const [bRow, bSeat] = b.split('-').map(Number);
+        return aRow === bRow ? aSeat - bSeat : aRow - bRow;
+      })
+      .map((key) => {
+        const [rowIdx, seatIdx] = key.split('-').map(Number);
+        return {
+          seatLabel: getSeatName(rowIdx, seatIdx),
+          seatNumber: getSeatNumber(rowIdx, seatIdx),
+        };
+      });
+
+    const seatNumbers = selectedSeats.map((item) => item.seatLabel);
+    const seatNumbersNumeric = selectedSeats
+      .map((item) => item.seatNumber)
+      .filter((value) => Number.isInteger(value));
+
+    seatStorage.reserveSeats(seatNumbers);
+
+    const priceValue = parseInt(String(selectedBus.price).replace(/\D/g, ''), 10) || 400;
+
+    const schedule = {
+      busName: selectedBus.name || selectedBus.busNumber || 'POWER TOOLS',
+      busType: selectedBus.type || 'Time bus',
+      from: selectedBus.from || selectedBus.source || 'LUSAKA',
+      to: selectedBus.to || selectedBus.destination || 'CHIPATA',
+      depart: selectedBus.timeFrom || selectedBus.depart || '5:00 AM',
+      arrive: selectedBus.timeTo || selectedBus.arrive || '12:00 PM',
+      seatNumbers,
+      seatNumbersNumeric,
+      pricePerSeat: priceValue,
+      busTripId: selectedBusTripId,
+      bookingSelectionType: option,
+    };
+
+    const passengerCount = option === 'self' ? 1 : seatNumbers.length;
+
+    setShowBookingModal(false);
+
+    navigation.navigate('PassDetails', {
+      schedule,
+      passengerCount,
+      bookingType: option,
+    });
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.root}>
       <StatusBar style="light" />
       <View style={styles.blobTop} />
       <View style={styles.blobBottom} />
 
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation?.goBack()}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <MaterialIcons name="chevron-left" size={26} color={COLORS.white} />
           </TouchableOpacity>
 
           <Text style={styles.headerTitle}>Select Seats</Text>
 
-          <View style={styles.routeContainer}>
-            <Text style={styles.routeText}>{bus.source}</Text>
-            <View style={styles.swapCircle}>
-              <FontAwesome5 name="exchange-alt" size={12} color={COLORS.white} />
-            </View>
-            <Text style={styles.routeText}>{bus.destination}</Text>
-          </View>
+          <View style={{ width: 40 }} />
+        </View>
 
-          <View style={styles.busPill}>
-            <MaterialIcons name="directions-bus" size={13} color={COLORS.primary} />
-            <Text style={styles.busNameText}>{bus.busNumber}</Text>
+        <View style={styles.routeContainer}>
+          <Text style={styles.routeText}>{selectedBus.from || selectedBus.source || 'LUSAKA'}</Text>
+          <View style={styles.swapCircle}>
+            <MaterialIcons name="arrow-forward" size={16} color={COLORS.white} />
           </View>
+          <Text style={styles.routeText}>{selectedBus.to || selectedBus.destination || 'CHIPATA'}</Text>
+        </View>
+
+        <View style={styles.busPill}>
+          <MaterialIcons name="directions-bus" size={14} color={COLORS.primary} />
+          <Text style={styles.busNameText}>
+            {selectedBus.name || selectedBus.busNumber || 'POWER TOOLS'}
+          </Text>
         </View>
 
         <View style={styles.bottomPanel}>
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={styles.sectionTitle}>Number of Tickets</Text>
-
-            {/* Quantity selector */}
-            <View style={styles.quantityContainer}>
-              <TouchableOpacity
-                style={styles.quantityBtn}
-                onPress={() => setQuantity(Math.max(1, quantity - 1))}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name="remove" size={24} color={COLORS.white} />
-              </TouchableOpacity>
-
-              <View style={styles.quantityDisplay}>
-                <Text style={styles.quantityText}>{quantity}</Text>
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.legendRow}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendBox, { backgroundColor: COLORS.seatAvailable }]} />
+                <Text style={styles.legendText}>Available</Text>
               </View>
-
-              <TouchableOpacity
-                style={styles.quantityBtn}
-                onPress={() => setQuantity(Math.min(bus.totalSeats, quantity + 1))}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name="add" size={24} color={COLORS.white} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Price info */}
-            <View style={styles.priceInfo}>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Price per Ticket</Text>
-                <Text style={styles.priceValue}>K {bus.price}</Text>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendBox, { backgroundColor: COLORS.seatSelected }]} />
+                <Text style={styles.legendText}>Selected</Text>
               </View>
-              <View style={styles.priceDivider} />
-              <View style={styles.priceRow}>
-                <Text style={styles.totalLabel}>Total Price</Text>
-                <Text style={styles.totalValue}>K {bus.price * quantity}</Text>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendBox, { backgroundColor: COLORS.seatBooked }]} />
+                <Text style={styles.legendText}>Booked</Text>
               </View>
             </View>
 
-            {/* Book button */}
+            {loadingSeatStatus && (
+              <View style={styles.seatStatusLoader}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+                <Text style={styles.seatStatusLoaderText}>Loading booked seats...</Text>
+              </View>
+            )}
+
+            <View style={styles.frontIndicator}>
+              <MaterialIcons name="navigation" size={13} color={COLORS.primary} />
+              <Text style={styles.frontText}>FRONT</Text>
+            </View>
+
+            <View style={styles.seatGrid}>
+              {seatRows.map((row, rowIndex) => (
+                <View
+                  key={`row-${rowIndex}`}
+                  style={[styles.seatRow, !row.includes('gap') && styles.lastRow]}
+                >
+                  {row.map((seatType, seatIndex) => {
+                    if (seatType === 'gap') {
+                      return <View key={`gap-${rowIndex}-${seatIndex}`} style={styles.aisleGap} />;
+                    }
+
+                    const key = `${rowIndex}-${seatIndex}`;
+                    const seatName = getSeatName(rowIndex, seatIndex);
+                    const seatNumber = getSeatNumber(rowIndex, seatIndex);
+                    const isSelected = selected.includes(key);
+                    const isReserved = seatStorage.isReserved(seatName);
+                    const isBookedFromBackend = seatNumber && bookedSeatSet.has(seatNumber);
+                    const bgColor = seatType === 'b' || isReserved || isBookedFromBackend
+                      ? COLORS.seatBooked
+                      : isSelected
+                        ? COLORS.seatSelected
+                        : COLORS.seatAvailable;
+
+                    return (
+                      <TouchableOpacity
+                        key={key}
+                        style={[styles.seat, { backgroundColor: bgColor }]}
+                        onPress={() => toggleSeat(rowIndex, seatIndex, seatType)}
+                        activeOpacity={seatType === 'b' || isReserved || isBookedFromBackend ? 1 : 0.7}
+                      >
+                        {isSelected ? (
+                          <MaterialIcons name="check" size={14} color={COLORS.root} />
+                        ) : (
+                          <Text style={styles.seatLabel}>{seatName}</Text>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+
+            {selected.length > 0 && (
+              <View style={styles.selectedInfo}>
+                <Text style={styles.selectedInfoText}>
+                  {selected.length} seat{selected.length > 1 ? 's' : ''} selected
+                </Text>
+              </View>
+            )}
+
             <TouchableOpacity
-              style={[styles.bookBtn, { opacity: quantity === 0 ? 0.5 : 1 }]}
+              style={[styles.reserveBtn, selected.length === 0 && { opacity: 0.6 }]}
               activeOpacity={0.85}
-              onPress={handleBook}
-              disabled={quantity === 0 || loading}
+              onPress={handleReserve}
+              disabled={selected.length === 0}
             >
-              {loading ? (
-                <Text style={styles.bookBtnText}>Processing...</Text>
-              ) : (
-                <>
-                  <Text style={styles.bookBtnText}>
-                    Book {quantity} {quantity === 1 ? 'Ticket' : 'Tickets'}
-                  </Text>
-                  {quantity > 0 && <MaterialIcons name="arrow-forward" size={20} color={COLORS.white} />}
-                </>
-              )}
+              <Text style={styles.reserveBtnText}>Continue</Text>
+              <MaterialIcons name="arrow-forward" size={20} color={COLORS.white} />
             </TouchableOpacity>
-
           </ScrollView>
         </View>
       </SafeAreaView>
+
+      <Modal
+        visible={showBookingModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowBookingModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Who are you booking for?</Text>
+            <Text style={styles.modalSub}>
+              You selected {selected.length} seat{selected.length > 1 ? 's' : ''}
+            </Text>
+
+            <TouchableOpacity style={styles.bookingOption} onPress={() => proceedWithBooking('self')}>
+              <MaterialIcons name="person" size={24} color={COLORS.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionTitle}>Just Me</Text>
+                <Text style={styles.optionSub}>Book one seat for yourself</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color={COLORS.primary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.bookingOption} onPress={() => proceedWithBooking('group')}>
+              <MaterialIcons name="group" size={24} color={COLORS.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionTitle}>Group Booking</Text>
+                <Text style={styles.optionSub}>Book all selected seats for others</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color={COLORS.primary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.bookingOption} onPress={() => proceedWithBooking('both')}>
+              <MaterialIcons name="people" size={24} color={COLORS.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionTitle}>Me and Others</Text>
+                <Text style={styles.optionSub}>Book selected seats for your group</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color={COLORS.primary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowBookingModal(false)}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: COLORS.root,
     overflow: 'hidden',
@@ -206,15 +448,15 @@ const styles = StyleSheet.create({
     height: 280,
     borderRadius: 140,
     backgroundColor: COLORS.blobBlue,
-    opacity: 0.18,
+    opacity: 0.15,
   },
   blobBottom: {
     position: 'absolute',
-    top: height * 0.25,
+    bottom: '30%',
     left: -60,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
     backgroundColor: COLORS.blobCyan,
     opacity: 0.1,
   },
@@ -222,17 +464,14 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Platform.OS === 'android' ? 30 : 0,
   },
-
-  // header
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingBottom: 24,
+    paddingBottom: 8,
   },
   backButton: {
-    position: 'absolute',
-    left: 24,
-    top: 0,
     width: 40,
     height: 40,
     borderRadius: 12,
@@ -243,16 +482,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    marginBottom: 16,
-    marginTop: 4,
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textHeader,
   },
   routeContainer: {
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
     gap: 12,
+    marginTop: 8,
     marginBottom: 12,
   },
   routeText: {
@@ -268,8 +507,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 6,
   },
   busPill: {
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -279,14 +524,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 6,
+    marginBottom: 10,
   },
   busNameText: {
     fontSize: 12,
     color: COLORS.textSecondary,
     fontWeight: '600',
   },
-
-  // panel
   bottomPanel: {
     flex: 1,
     backgroundColor: COLORS.card,
@@ -302,141 +546,100 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
     alignItems: 'center',
   },
-
-  // section title
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textHeader,
-    marginBottom: 32,
-  },
-
-  // quantity selector
-  quantityContainer: {
+  legendRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
     gap: 20,
-    marginBottom: 32,
-    backgroundColor: COLORS.inputBg,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    marginBottom: 24,
   },
-  quantityBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quantityDisplay: {
-    minWidth: 60,
-    alignItems: 'center',
-  },
-  quantityText: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: COLORS.primary,
-  },
-
-  // price info
-  priceInfo: {
-    width: '100%',
-    backgroundColor: COLORS.inputBg,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    padding: 20,
-    marginBottom: 28,
-  },
-  priceRow: {
+  seatStatusLoader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginVertical: 8,
+    gap: 8,
+    marginBottom: 16,
   },
-  priceLabel: {
-    fontSize: 14,
+  seatStatusLoaderText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  legendBox: {
+    width: 14,
+    height: 14,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontSize: 12,
     color: COLORS.textSecondary,
     fontWeight: '500',
   },
-  priceValue: {
-    fontSize: 14,
-    color: COLORS.textHeader,
-    fontWeight: '600',
-  },
-  priceDivider: {
-    height: 1,
-    backgroundColor: COLORS.cardBorder,
-    marginVertical: 12,
-  },
-  totalLabel: {
-    fontSize: 16,
-    color: COLORS.textHeader,
-    fontWeight: '700',
-  },
-  totalValue: {
-    fontSize: 20,
-    color: COLORS.primary,
-    fontWeight: '800',
-  },
-
-  // legend (removed - no longer needed)
-  legendRow: {
-    display: 'none',
-  },
-  legendItem: {
-    display: 'none',
-  },
-  legendBox: {
-    display: 'none',
-  },
-  legendText: {
-    display: 'none',
-  },
-
-  // front (removed - no longer needed)
   frontIndicator: {
-    display: 'none',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 16,
+    backgroundColor: COLORS.primary + '18',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
   },
   frontText: {
-    display: 'none',
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '700',
   },
-
-  // seat grid (removed - no longer needed)
   seatGrid: {
-    display: 'none',
+    alignItems: 'center',
+    marginBottom: 28,
+    backgroundColor: COLORS.inputBg,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    padding: 20,
   },
   seatRow: {
-    display: 'none',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   lastRow: {
-    display: 'none',
+    justifyContent: 'space-between',
+    width: 250,
   },
   seat: {
-    display: 'none',
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    marginHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   seatLabel: {
-    display: 'none',
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.textHeader,
   },
   aisleGap: {
-    display: 'none',
+    width: 28,
   },
-
-  // selected info (removed - no longer needed)
   selectedInfo: {
-    display: 'none',
+    backgroundColor: COLORS.seatSelected + '20',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 16,
   },
   selectedInfoText: {
-    display: 'none',
+    color: COLORS.seatSelected,
+    fontSize: 13,
+    fontWeight: '700',
   },
-
-  // book button
-  bookBtn: {
+  reserveBtn: {
     backgroundColor: COLORS.primary,
     width: '100%',
     maxWidth: 340,
@@ -446,11 +649,80 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
   },
-  bookBtnText: {
+  reserveBtnText: {
     color: COLORS.white,
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.card,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 32,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.cardBorder,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.textHeader,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSub: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  bookingOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.inputBg,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 12,
+    gap: 12,
+  },
+  optionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textHeader,
+    marginBottom: 4,
+  },
+  optionSub: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  cancelBtn: {
+    marginTop: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: COLORS.inputBg,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  cancelBtnText: {
+    color: COLORS.textSecondary,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });

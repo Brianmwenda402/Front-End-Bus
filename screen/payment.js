@@ -2,12 +2,9 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Platform, StatusBar, Alert,
+  TextInput, SafeAreaView, Platform, StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useUser } from '../context/UserContext';
-import { bookingsApi } from '../api/api';
 
 const COLORS = {
   root:          '#0f202a',
@@ -32,8 +29,6 @@ const METHODS = [
 ];
 
 export default function PaymentConfirmationScreen({ navigation, route }) {
-  const { addTicket, user } = useUser();
-
   const getCurrentDate = () => {
     const d = new Date();
     const day = String(d.getDate()).padStart(2, '0');
@@ -54,75 +49,13 @@ export default function PaymentConfirmationScreen({ navigation, route }) {
   const [mobile,   setMobile]   = useState('');
   const [loading,  setLoading]  = useState(false);
   const [paid,     setPaid]     = useState(false);
-  const [createdBookings, setCreatedBookings] = useState([]);
 
   const fmtCard   = v => v.replace(/\D/g,'').slice(0,16).replace(/(.{4})/g,'$1 ').trim();
   const fmtExpiry = v => { const d = v.replace(/\D/g,'').slice(0,4); return d.length >= 3 ? d.slice(0,2)+'/'+d.slice(2) : d; };
-  const scheduleWithBackendData = {
-    ...schedule,
-    backendBookingIds: createdBookings
-      .map((item) => item?.id)
-      .filter((id) => id != null),
-  };
 
-  const handlePay = async () => {
-    const userId = Number(user?.id);
-    const busTripId = Number(schedule?.busTripId);
-    const seatNumbersNumeric = Array.isArray(schedule?.seatNumbersNumeric)
-      ? schedule.seatNumbersNumeric
-      : [];
-
-    if (!Number.isInteger(userId) || userId <= 0) {
-      Alert.alert('Login Required', 'Please log in again before making a booking.');
-      return;
-    }
-
-    if (!Number.isInteger(busTripId) || busTripId <= 0) {
-      Alert.alert('Trip Missing', 'Trip information is missing. Please select your trip again.');
-      return;
-    }
-
-    if (seatNumbersNumeric.length === 0) {
-      Alert.alert('Seats Missing', 'Seat information is missing. Please select your seats again.');
-      return;
-    }
-
+  const handlePay = () => {
     setLoading(true);
-    try {
-      const bookingRequests = seatNumbersNumeric.map((seatNumber) =>
-        bookingsApi.createBooking({
-          userId,
-          busTripId,
-          seatNumber,
-          bookingType: 'SELF',
-          selfBooking: true,
-        })
-      );
-
-      const bookingResults = await Promise.all(bookingRequests);
-      setCreatedBookings(bookingResults);
-
-      const scheduleWithBooking = {
-        ...schedule,
-        backendBookingIds: bookingResults
-          .map((item) => item?.id)
-          .filter((id) => id != null),
-      };
-
-      addTicket({
-        schedule: scheduleWithBooking,
-        passengers,
-        totalAmount,
-        backendBookings: bookingResults,
-      });
-
-      setPaid(true);
-    } catch (error) {
-      console.error('Booking API error:', error);
-      Alert.alert('Booking Failed', error.message || 'Unable to complete your booking right now.');
-    } finally {
-      setLoading(false);
-    }
+    setTimeout(() => { setLoading(false); setPaid(true); }, 2000);
   };
 
   // ── SUCCESS ──────────────────────────────────────────
@@ -148,7 +81,6 @@ export default function PaymentConfirmationScreen({ navigation, route }) {
               { label: 'Amount Paid', value: `ZMW ${totalAmount.toLocaleString()}` },
               { label: 'Route',       value: `${schedule.from} → ${schedule.to}`   },
               { label: 'Seats',       value: schedule.seatNumbers?.join(', ')       },
-              { label: 'Booking Ref', value: scheduleWithBackendData.backendBookingIds.join(', ') || 'N/A' },
               { label: 'Date',        value: schedule.date                          },
               { label: 'Departure',   value: schedule.depart                        },
             ].map((r, i) => (
@@ -159,26 +91,12 @@ export default function PaymentConfirmationScreen({ navigation, route }) {
             ))}
           </View>
 
-          <TouchableOpacity
-            style={p.viewTicketBtn}
-            onPress={() =>
-              navigation?.navigate('YourTicket', {
-                passengers,
-                schedule: scheduleWithBackendData,
-                bookings: createdBookings,
-              })
-            }
-            activeOpacity={0.85}
-          >
+          <TouchableOpacity style={p.viewTicketBtn} onPress={() => navigation?.navigate('YourTicket', { passengers, schedule })} activeOpacity={0.85}>
             <MaterialIcons name="confirmation-number" size={18} color={COLORS.white} />
             <Text style={p.viewTicketBtnText}>View My Ticket</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={p.homeBtn}
-            onPress={() => navigation?.reset({ index: 0, routes: [{ name: 'UserTabs', params: { screen: 'Book' } }] })}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity style={p.homeBtn} onPress={() => navigation?.navigate('Main')} activeOpacity={0.8}>
             <Text style={p.homeBtnText}>Back to Home</Text>
           </TouchableOpacity>
         </View>

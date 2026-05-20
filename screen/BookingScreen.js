@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useUser } from '../context/UserContext';
+import CONFIG from '../config/config';
 
 const COLORS = {
   root:          '#0f202a',
@@ -21,7 +22,7 @@ const COLORS = {
   white:         '#FFFFFF',
 };
 
-const API_BASE_URL = "http://10.26.129.86:8089/api";
+const API_BASE_URL = `${CONFIG.API_BASE_URL}/api`;
 
 export default function MyTicketsScreen({ navigation }) {
   const { user } = useUser();
@@ -45,7 +46,7 @@ export default function MyTicketsScreen({ navigation }) {
       const bookingsData = await bookingsRes.json();
       
       // Fetch all trips
-      const tripsRes = await fetch(`${API_BASE_URL}/trips`);
+      const tripsRes = await fetch(`${API_BASE_URL}/trips/all`);
       const tripsData = await tripsRes.json();
       
       setBookings(Array.isArray(bookingsData) ? bookingsData : []);
@@ -63,7 +64,7 @@ export default function MyTicketsScreen({ navigation }) {
     if (bookings.length === 0) return [];
 
     return bookings.map(booking => {
-      const trip = trips.find(t => t.id === booking.busTripId);
+      const trip = trips.find(t => t.id === (booking.busTripId ?? booking.tripId));
       if (!trip) return null;
 
       const departTime = new Date(trip.departureTime * 1000).toLocaleTimeString('en-US', { 
